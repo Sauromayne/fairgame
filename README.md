@@ -62,6 +62,7 @@ FairGame Alpha only works on Amazon using smile.amazon.com as the domain and can
   EU wants to figure this out and submit a pull request, that would be great.
 * FairGame organizes the products being checked into lists, and each list is subject to a minimum and maximum 
   purchase price range. Once an item is purchased from any list the checkout worker will close and the bot will need to be restarted in order to make more purchase.
+* If Fairgame catches a drop and you see several `turbo-initiate` pages with a 200 status code this **VERY LIKELY** means that the drop is already gone and Amazon is serving you   a garbage page!
 
 ### Disclaimer 
 
