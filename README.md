@@ -49,6 +49,8 @@ for MSRP.
 
 ## Current Functionality
 
+**ALPHA BRANCH IS A WORK IN PROGRESS, ANY OF THE FOLLOWING STEPS IN THIS README ARE SUBJECT TO CHANGE**
+
 FairGame Alpha only works on Amazon using smile.amazon.com as the domain and can automatically place an order.
 ### Other Notes on Functionality
 * By default, FairGame Alpha will only purchase items with free shipping. Please see [Configuration](#Configuration) 
