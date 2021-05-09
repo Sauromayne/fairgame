@@ -155,7 +155,7 @@ dependencies in other operating systems:
 8. Verify that the bot successfully places an order with the item you put in the config file. **NOTE: WITH ALPHA, TEST MODE NO LONGER FUNCTIONS THE SAME WAY. YOU SHOULD TRY AND BUY SOMETHING TO VERIFY THE BOT WORKS FOR YOU!**
    If it does not, then:
    * You messed something up above, and need to fix it; or,
-   * If it is asking you for your address and payment info, you need to do all of the following in a separate
+   * If the bot will not make a purchase on an in stock item and you are not softbanned, you need to do all of the following in a separate
      tab within the bots browser. Start the bot, wait for the homepage to load, then close out of the command prompt. This should allow you to perform the following steps in the      bots browser:
      * Make sure one-click purchasing is set up for your account, 
      * Verify there is a default payment method and default address associated with that payment method,
