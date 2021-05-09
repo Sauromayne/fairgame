@@ -329,7 +329,7 @@ In the `config` folder, make a copy of `proxies.template_json` and
 [rename](https://www.google.com/search?q=how+to+change+file+extensions+on+windows+10) it to `proxies.json`. Edit it 
 according to your proxy list, the process for editing the proxies json is the same as editing the aio_config json.
 
-We do not have any recommendations for which proxies are better or worse, try asking [Google](www.google.com/search?q=buy+proxies).
+We do not have any recommendations for which proxies are better or worse, try asking [Google](https://www.google.com/search?q=where+to+buy+proxies).
 
 #### Examples
 
