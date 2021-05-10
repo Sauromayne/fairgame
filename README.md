@@ -415,7 +415,7 @@ You can see in the above image how I am only receiving 503 errors for ASIN's: B0
 
 ![proxies_troubleshoot](https://user-images.githubusercontent.com/20719891/117586748-f0860a80-b0ce-11eb-9ddb-294630bfea67.jpg)
 
-By looking at your config you will be able to determine which proxies need to be replaced. In the above example I can see that the proxies in the 2nd and 7th dictionaries need to be replasced in the `proxies.json` file.
+By looking at your config you will be able to determine which proxies need to be replaced. In the above example I can see that the proxies in the 2nd and 7th dictionaries need to be replaced in the `proxies.json` file.
 
 If you want to add the ASIN to your html_saves files, open `amazon_monitoring.py` with a text editor. The file is located in the `stores` folder. If you do not know how to open files with a text editor do not attempt this step.
 
