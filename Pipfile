@@ -5,12 +5,13 @@ verify_ssl = true
 
 [dev-packages]
 pyinstaller = "*"
+pylint = "*"
 
 [packages]
-requests = "==2.24.0"
+requests = {extras = ["socks"], version = "*"}
 click = "*"
 selenium = "*"
-chromedriver-py = "~=90.0"
+chromedriver-py = "~=89.0.4389.23"
 furl = "*"
 twilio = "*"
 discord-webhook = "*"
@@ -36,6 +37,9 @@ packaging = "*"
 config = "*"
 lxml = "*"
 dnspython = "*"
+fake-useragent = "*"
+pysocks = "*"
+aiohttp-proxy = "*"
 
 [requires]
 python_version = "3.8"
