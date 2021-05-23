@@ -17,21 +17,26 @@
 #      The author may be contacted through the project's GitHub, at:
 #      https://github.com/Hari-Nagarajan/fairgame
 
+import base64
 import os
 import platform
 import shutil
 import time
+import urllib
 import traceback
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
 from signal import SIGINT, signal
+import asyncio
+from typing import Optional, List
 
 import click
 
 from common.globalconfig import AMAZON_CREDENTIAL_FILE, GlobalConfig
 from notifications.notifications import NotificationHandler, TIME_FORMAT
-from stores.amazon import Amazon
+
+from stores.amazon_handler import AmazonStoreHandler as AIO_AmazonStoreHandler
 from utils.logger import log
 from utils.version import is_latest, version, get_latest_version
 
@@ -39,6 +44,8 @@ LICENSE_PATH = os.path.join(
     "cli",
     "license",
 )
+
+tasks: List[asyncio.Task] = []
 
 
 def get_folder_size(folder):
@@ -56,6 +63,11 @@ def sizeof_fmt(num, suffix="B"):
 # see https://docs.python.org/3/library/signal.html
 def interrupt_handler(signal_num, frame):
     log.info(f"Caught the interrupt signal.  Exiting.")
+    global tasks
+    if tasks:
+        log.debug(f"Canceling {len(tasks)} tasks")
+        for task in tasks:
+            task.cancel()
     exit(0)
 
 
@@ -64,13 +76,21 @@ def notify_on_crash(func):
     def decorator(*args, **kwargs):
         try:
             func(*args, **kwargs)
-
         except KeyboardInterrupt:
             pass
-
         except Exception as e:
-            log.error(traceback.format_exc())
+            log.error(e)
+            track = traceback.format_exc()
+            log.error(track)
             notification_handler.send_notification(f"FairGame has crashed.")
+            global tasks
+            if tasks:
+                for task in tasks:
+                    try:
+                        task.cancel()
+                    except:
+                        pass
+            raise
 
     return decorator
 
@@ -80,82 +100,7 @@ def main():
     pass
 
 
-# @click.command()
-# @click.option(
-#     "--gpu",
-#     type=click.Choice(GPU_DISPLAY_NAMES, case_sensitive=False),
-#     prompt="What GPU are you after?",
-#     cls=QuestionaryOption,
-# )
-# @click.option(
-#     "--locale",
-#     type=click.Choice(CURRENCY_LOCALE_MAP.keys(), case_sensitive=False),
-#     prompt="What locale shall we use?",
-#     cls=QuestionaryOption,
-# )
-# @click.option("--test", is_flag=True)
-# @click.option("--interval", type=int, default=5)
-# @notify_on_crash
-# def nvidia(gpu, locale, test, interval):
-#     nv = NvidiaBuyer(
-#         gpu,
-#         notification_handler=notification_handler,
-#         locale=locale,
-#         test=test,
-#         interval=interval,
-#     )
-#     nv.run_items()
-
-
 @click.command()
-@click.option("--no-image", is_flag=True, help="Do not load images")
-@click.option("--headless", is_flag=True, help="Headless mode.")
-@click.option(
-    "--test",
-    is_flag=True,
-    help="Run the checkout flow, but do not actually purchase the item[s]",
-)
-@click.option(
-    "--delay", type=float, default=3.0, help="Time to wait between checks for item[s]"
-)
-@click.option(
-    "--checkshipping",
-    is_flag=True,
-    help="Factor shipping costs into reserve price and look for items with a shipping price",
-)
-@click.option(
-    "--detailed",
-    is_flag=True,
-    help="Take more screenshots. !!!!!! This could cause you to miss checkouts !!!!!!",
-)
-@click.option(
-    "--used",
-    is_flag=True,
-    help="Show used items in search listings.",
-)
-@click.option("--single-shot", is_flag=True, help="Quit after 1 successful purchase")
-@click.option(
-    "--no-screenshots",
-    is_flag=True,
-    help="Take NO screenshots, do not bother asking for help if you use this... Screenshots are the best tool we have for troubleshooting",
-)
-@click.option(
-    "--disable-presence",
-    is_flag=True,
-    help="Disable Discord Rich Presence functionallity",
-)
-@click.option(
-    "--disable-sound",
-    is_flag=True,
-    default=False,
-    help="Disable local sounds.  Does not affect Apprise notification " "sounds.",
-)
-@click.option(
-    "--slow-mode",
-    is_flag=True,
-    default=False,
-    help="Uses normal page load strategy for selenium. Default is none",
-)
 @click.option(
     "--p",
     type=str,
@@ -163,102 +108,30 @@ def main():
     help="Pass in encryption file password as argument",
 )
 @click.option(
-    "--log-stock-check",
-    is_flag=True,
-    default=False,
-    help="writes stock check information to terminal and log",
-)
-@click.option(
-    "--shipping-bypass",
-    is_flag=True,
-    default=False,
-    help="Will attempt to click ship to address button. USE AT YOUR OWN RISK!",
-)
-@click.option(
-    "--clean-profile",
-    is_flag=True,
-    default=False,
-    help="Purge the user profile that Fairgame uses for browsing",
-)
-@click.option(
-    "--clean-credentials",
-    is_flag=True,
-    default=False,
-    help="Purge Amazon credentials and prompt for new credentials",
-)
-@click.option(
-    "--alt-checkout",
-    is_flag=True,
-    default=False,
-    help="Use old add to cart method. Not preferred",
-)
-@click.option(
-    "--captcha-wait",
-    is_flag=True,
-    default=False,
-    help="Wait if captcha could not be solved. Only occurs if enters captcha handler during checkout.",
+    "--delay", type=float, default=5.0, help="Time to wait between checks for item[s]"
 )
 @notify_on_crash
-def amazon(
-    no_image,
-    headless,
-    test,
-    delay,
-    checkshipping,
-    detailed,
-    used,
-    single_shot,
-    no_screenshots,
-    disable_presence,
-    disable_sound,
-    slow_mode,
-    p,
-    log_stock_check,
-    shipping_bypass,
-    clean_profile,
-    clean_credentials,
-    alt_checkout,
-    captcha_wait,
-):
-    notification_handler.sound_enabled = not disable_sound
-    if not notification_handler.sound_enabled:
-        log.info("Local sounds have been disabled.")
-
-    if clean_profile and os.path.exists(global_config.get_browser_profile_path()):
-        log.info(
-            f"Removing existing profile at '{global_config.get_browser_profile_path()}'"
-        )
-        profile_size = get_folder_size(global_config.get_browser_profile_path())
-        shutil.rmtree(global_config.get_browser_profile_path())
-        log.info(f"Freed {profile_size}")
-
-    if clean_credentials and os.path.exists(AMAZON_CREDENTIAL_FILE):
-        log.info(f"Removing existing Amazon credentials from {AMAZON_CREDENTIAL_FILE}")
-        os.remove(AMAZON_CREDENTIAL_FILE)
-
-    amzn_obj = Amazon(
-        headless=headless,
-        notification_handler=notification_handler,
-        checkshipping=checkshipping,
-        detailed=detailed,
-        used=used,
-        single_shot=single_shot,
-        no_screenshots=no_screenshots,
-        disable_presence=disable_presence,
-        slow_mode=slow_mode,
-        no_image=no_image,
-        encryption_pass=p,
-        log_stock_check=log_stock_check,
-        shipping_bypass=shipping_bypass,
-        alt_checkout=alt_checkout,
-        wait_on_captcha_fail=captcha_wait,
+def amazon_aio(p, delay):
+    log.debug("Creating AIO Amazon Store Handler")
+    aio_amazon_obj = AIO_AmazonStoreHandler(
+        notification_handler=notification_handler, encryption_pass=p, delay=delay
     )
-    try:
-        amzn_obj.run(delay=delay, test=test)
-    except RuntimeError:
-        del amzn_obj
-        log.error("Exiting Program...")
-        time.sleep(5)
+    global tasks
+    log.debug("Creating AIO Amazon Store Tasks")
+    tasks = asyncio.run(aio_amazon_obj.run_async())
+    if tasks:
+        for task in tasks:
+            task.cancel()
+    log.info("All tasks complete, exiting program")
+
+
+# async def task_handler(tasks: List[asyncio.Task]):
+#     while tasks:
+#         for task in tasks:
+#             if task.done():
+#                 task.cancel()
+#     await asyncio.sleep(5)
+#     return
 
 
 @click.option(
@@ -316,10 +189,10 @@ def show(w, c):
                 print(file.read())
             except FileNotFoundError:
                 log.error("License File Missing. Quitting Program")
-                exit(0)
+                return
     else:
         log.error("License File Missing. Quitting Program.")
-        exit(0)
+        return
 
 
 @click.command()
@@ -409,14 +282,20 @@ def show_traceroutes(domain):
         log.info(f" {trace_command}{endpoint}")
 
 
+@click.command()
+def test_logging():
+    log.dev("This is a test of the dev log level")
+
+
 # Register Signal Handler for Interrupt
 signal(SIGINT, interrupt_handler)
 
-main.add_command(amazon)
 main.add_command(test_notifications)
 main.add_command(show)
 main.add_command(find_endpoints)
 main.add_command(show_traceroutes)
+main.add_command(test_logging)
+main.add_command(amazon_aio)
 
 # Global scope stuff here
 if is_latest():
